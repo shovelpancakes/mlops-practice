@@ -1,0 +1,64 @@
+name: Train and Report (CML)
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  run-experiment:
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 нужен, чтобы DVC мог сравнить текущую ветку с историей main
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Setup CML
+        uses: iterative/setup-cml@v2
+
+      - name: Установка зависимостей
+        run: |
+          pip install -r requirements.txt
+          pip install dvc[s3]
+
+      - name: Настройка DVC Remote (Cloud.ru)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          dvc remote add -d cloudru s3://bucket-dvc-bucket-krai/dvc_data
+          dvc remote modify cloudru endpointurl https://s3.cloud.ru
+          dvc remote modify cloudru region ru-central-1
+
+      - name: Загрузка данных
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: dvc pull
+
+      - name: Воспроизведение пайплайна (обучение)
+        run: dvc repro
+
+      - name: Создание отчета CML
+        env:
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "## Результаты эксперимента" > report.md
+          echo "### Изменения параметров:" >> report.md
+          dvc params diff main --md >> report.md
+          echo "### Изменения метрик:" >> report.md
+          dvc metrics diff main --md >> report.md
+
+      - name: Отправка отчета в Pull Request
+        env:
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: cml comment create report.md
