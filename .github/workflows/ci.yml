@@ -20,20 +20,9 @@ jobs:
           cache: 'pip'
 
       - name: Установка зависимостей
-        run: |
-          pip install -r requirements.txt
-          pip install dvc[s3]
+        run: pip install -r requirements.txt
 
-      - name: Настройка DVC Remote (Cloud.ru)
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: |
-          dvc remote add -d cloudru s3://bucket-dvc-bucket-krai/dvc_data
-          dvc remote modify cloudru endpointurl https://s3.cloud.ru
-          dvc remote modify cloudru region ru-central-1
-
-      - name: Загрузка данных через DVC
+      - name: Загрузка данных через DVC (из Cloud.ru)
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
